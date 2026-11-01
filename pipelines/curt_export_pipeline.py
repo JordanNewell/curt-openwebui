@@ -148,8 +148,10 @@ class Pipeline:
             return None
 
         now_ms = int(time.time() * 1000)
-        meta = self._fetch_chat_meta(chat_id) or {}
-        chat_body = body.get("chat") if isinstance(body.get("chat"), dict) else {}
+        meta: dict = self._fetch_chat_meta(chat_id) or {}
+        chat_body = body.get("chat")
+        if not isinstance(chat_body, dict):
+            chat_body = {}
 
         title = (
             meta.get("title")
