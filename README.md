@@ -50,6 +50,23 @@ All field names were verified against the open-webui `main` source (not guessed)
 - **Chat UI state**: pinned/archived/tags/folder membership beyond
   `folder_id` is not exported.
 
+## Live smoke (2026-11-01)
+
+Both artifacts verified against a real Open WebUI instance (current `main`
+image, API-key auth over HTTP):
+
+- CLI fetched live chats via `/api/v1/chats/all` and wrote parseCurt-valid
+  `.curt` files — tree traversal, block-array content (joined + preserved as
+  `openwebuiContent`), and model fields all exercised on real API records.
+- Python pipeline serializer cross-checked 2/2 valid on the same records.
+- Known parity gap (pre-PR): the pipeline maps the *turn body* message list
+  and does not traverse `chat.history` parent-linked trees — the CLI handles
+  trees. Align before or during the upstream PR.
+- Deploy gotcha: API keys require env `ENABLE_API_KEYS` (plural). The value
+  is persisted to the DB at first boot — setting the env on an existing
+  instance is not enough; flip it in Admin Settings or start with a fresh
+  data volume.
+
 ## CLI usage
 
 ```sh
