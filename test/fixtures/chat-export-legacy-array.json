@@ -1,0 +1,24 @@
+[
+  {
+    "id": "aa000000-0000-4000-8000-00000000aa01",
+    "user_id": "synthetic-user",
+    "title": "Fixture: legacy array export",
+    "chat": {
+      "id": "aa000000-0000-4000-8000-00000000aa01",
+      "title": "Fixture: legacy array export",
+      "models": ["qwen2.5:7b"],
+      "messages": [
+        { "id": "old-1", "parentId": null, "childrenIds": ["old-2"], "role": "user", "content": "Ping", "timestamp": 1735689600 },
+        { "id": "old-2", "parentId": "old-1", "childrenIds": [], "role": "assistant", "content": "Pong", "timestamp": 1735689605, "model": "qwen2.5:7b" }
+      ],
+      "history": { "currentId": "old-2", "messages": {} }
+    },
+    "created_at": 1735689600,
+    "updated_at": 1735689606,
+    "archived": false,
+    "pinned": false,
+    "meta": {},
+    "variables": {},
+    "folder_id": null
+  }
+]
