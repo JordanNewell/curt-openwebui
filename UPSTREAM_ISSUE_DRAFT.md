@@ -1,46 +1,27 @@
-# Upstream issue draft (not posted)
+### Problem
 
-> Target: `open-webui/pipelines` → Issues. Posts under JordanNewell.
-> Framing: contribution-first, complementary-not-critical, verifiable-only.
-> Never criticize the native export; the pipelines framework is the hero.
+Open WebUI's native export (NDJSON) handles instance migration and backup well, but there is no interop path outside Open WebUI: the export payload is the internal chat object, so external tools can't consume it without reimplementing the internals (the `history` message tree keyed by `parentId`, epoch-seconds timestamps, `chat` payload nesting, block-array content). I'm trying to get conversations into portable, tool-agnostic formats, but every consumer has to re-derive what the UI already knows.
 
----
+### Desired Behavior
 
-**Title: Filter: per-conversation portable export (`.curt` single-file format) — follows `examples/filters` conventions**
+A portable per-conversation export that preserves what the UI actually renders — the visible branch (`history.currentId` parent-chain walk), roles, model ids, timestamps, attachments — in an open, self-describing single-file format. With the Functions system this requires no core changes: I've built and verified a Filter Function that does exactly this on `outlet`, and I'm sharing it as a working reference.
 
-The pipelines framework makes it straightforward to add capabilities to
-conversations without touching core — this is a filter in that mold.
+**What the Function does** (`curt_export_function.py`, single stdlib-only file, installs via the admin Functions importer): serializes the conversation to a [`.curt`](https://github.com/JordanNewell/dot_curt) file — a small open single-file conversation format (JSON envelope, epoch-ms timestamps, strict whole-file validation, unknown fields preserved on round-trip). Regenerate variants are counted in a passthrough field; attachments ride as passthrough `files`. Files follow the format's `YYYY-MM-DD slug id-suffix.curt` bulk naming and are validated before being kept. Export failures never break the chat turn.
 
-Open WebUI's native export (NDJSON) handles instance migration and backup
-well. The one thing it doesn't cover is interop outside Open WebUI: the
-payload is the internal chat object, so other tools can't consume it without
-reimplementing the internals. A portable per-conversation format closes that
-gap, and it can be added entirely from a filter — no core changes.
+### Why This Matters
 
-**What the filter does** (`curt_export_pipeline.py`, ~500 lines, stdlib +
-optional `requests`): on `outlet`, serializes the conversation to a
-[`.curt`](https://github.com/JordanNewell/dot_curt) file — a small open
-single-file conversation format (JSON envelope, epoch-ms timestamps, strict
-whole-file validation, unknown fields preserved on round-trip). Mapping is
-lossless for the rendered branch: roles, model ids, timestamps; regenerate
-variants are counted in a passthrough field; attachments ride as passthrough
-`files`. Writes follow the format's `YYYY-MM-DD slug id-suffix.curt` bulk
-naming, and each file is validated before being kept.
+- **Users** get conversations in a format any tool can read — not locked to re-import into the same instance
+- **The Functions ecosystem** gains a reference implementation demonstrating outlet-time per-conversation export, including the less-documented parts (`__user__` injection, `chat_id` in the outlet body, `error === true` hidden-message semantics)
+- **The format spec** ([dotcurt.org](https://dotcurt.org)) stays vendor-neutral: the `curt` magic field is a legacy string, nothing in the format favors any product
 
-**Verification** (all runnable from the repo):
+### Examples
 
-- Round-trip against the format's reference parser — green
-- vitest + pytest suites: 32 + 27 tests (plain, legacy-flat, block-array,
-  regenerate-variant chats, NDJSON edge cases)
-- Parity test: pipeline and CLI outputs are deep-compared on a shared fixture,
-  so the two mappings can't drift
-- Schema mapping verified field-by-field against `open-webui/main` source
-  (`chats.py`, `Messages.svelte`, `ResponseMessage.svelte`) — cited in-repo
+Source repo: https://github.com/JordanNewell/curt-openwebui — the Function is `functions/curt_export_function.py`, install steps in `functions/INSTALL.md`.
 
-Source: https://github.com/JordanNewell/curt-openwebui
-(pipeline: `pipelines/curt_export_pipeline.py`)
+Verification (all runnable from the repo):
 
-If this fits the project's direction, I'm glad to contribute it as a PR under
-`examples/filters/` — happy to hear preferences on shape (standalone example
-file vs. docs-listed external project). Either way, thanks for the pipelines
-framework; it's what makes this possible without a fork.
+- 79 tests across three implementations (standalone CLI, legacy Pipelines filter, Functions port) — vitest 32, pytest 47
+- Cross-implementation parity tests: all three share fixtures and are deep-compared on every run, so mappings can't drift
+- Mapping verified field-by-field against `open-webui/main` source (`chats.py`, `Messages.svelte`, `ResponseMessage.svelte`); Function conventions verified against `utils/filter.py` and `utils/middleware.py` (`__user__` injection, `chat_id` in the outlet body)
+
+Two shapes this could take, happy either way: (a) the Function lives as a community contribution — if there's a preferred channel for sharing those (docs tutorial? community library?), I'll adapt it to that format; (b) if portable export is interesting as a native option someday (Settings → Chats), the mapping logic is standalone and could seed that without redesign. Per the contributing guidance I am not opening a PR for this — sharing the code as reference here.
