@@ -17,7 +17,7 @@ import re
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 try:
@@ -69,7 +69,7 @@ def _content_to_text(content) -> Tuple[str, bool]:
     return str(content), False
 
 
-def _flatten_visible(chat_body: dict, chat: dict, stats: dict) -> List[dict]:
+def _flatten_visible(chat_body: Any, chat: Any, stats: dict) -> List[dict]:
     """Walk the parent chain ending at history.currentId — the exact branch the
     Open WebUI UI renders (Messages.svelte buildMessages). Identical rule to the
     CLI's flattenMessages in src/convert.ts so the two never drift:
@@ -85,7 +85,7 @@ def _flatten_visible(chat_body: dict, chat: dict, stats: dict) -> List[dict]:
     """
     history = chat_body.get("history")
     history_map = history.get("messages") if isinstance(history, dict) else None
-    if isinstance(history_map, dict) and len(history_map) > 0:
+    if isinstance(history, dict) and isinstance(history_map, dict) and len(history_map) > 0:
         cursor = history.get("currentId") or chat.get("current_message_id")
 
         # Fall back to the deepest leaf if the chat has no current pointer.
@@ -95,8 +95,8 @@ def _flatten_visible(chat_body: dict, chat: dict, stats: dict) -> List[dict]:
                 for m in history_map.values()
                 if not (
                     isinstance(m, dict)
-                    and m.get("childrenIds")
-                    and len(m.get("childrenIds")) > 0
+                    and isinstance(m.get("childrenIds"), list)
+                    and len(m["childrenIds"]) > 0
                 )
             ]
             if not leaves:
@@ -130,7 +130,7 @@ def _flatten_visible(chat_body: dict, chat: dict, stats: dict) -> List[dict]:
     return []
 
 
-def convert_chat(chat: dict) -> Tuple[dict, dict]:
+def convert_chat(chat: Any) -> Tuple[dict, dict]:
     """Convert one Open WebUI chat (ChatResponse shape) into a .curt v1
     conversation, using the exact same rules as the CLI's convertChat in
     src/convert.ts. Returns (conversation, stats); see scripts/parity-check.md
@@ -266,7 +266,7 @@ def serialize_curt(conversation: dict, generator: str) -> str:
     return json.dumps(envelope, indent="\t", ensure_ascii=False)
 
 
-def is_valid_conversation(conversation: dict) -> bool:
+def is_valid_conversation(conversation: Any) -> bool:
     """Mirror of the .curt v1 validation rules (validation is whole-file)."""
     if not isinstance(conversation, dict):
         return False
@@ -325,7 +325,8 @@ class Pipeline:
     async def on_shutdown(self):
         logger.debug(f"on_shutdown:{self.name}")
 
-    async def inlet(self, body: dict, user: Optional[dict] = None) -> dict:
+    async def inlet(self, body: dict, user: Optional[dict] = None) -> dict:  # noqa: ARG002 - framework signature
+        del user
         return body
 
     async def outlet(self, body: dict, user: Optional[dict] = None) -> dict:
@@ -339,7 +340,7 @@ class Pipeline:
             logger.exception("curt export failed")
         return body
 
-    def _export(self, body: dict, user: Optional[dict]) -> Optional[str]:
+    def _export(self, body: dict, user: Optional[dict] = None) -> Optional[str]:
         chat_id = body.get("chat_id") or f"openwebui_{uuid.uuid4().hex[:12]}"
         now_ms = int(time.time() * 1000)
         now_s = now_ms / 1000.0

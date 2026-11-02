@@ -9,7 +9,7 @@ import pytest
 
 import curt_export_pipeline as cep
 
-from test_convert_chat import PLAIN_HISTORY, BLOCK_HISTORY
+from pipelines.tests.test_convert_chat import PLAIN_HISTORY, BLOCK_HISTORY
 
 
 @pytest.fixture()
