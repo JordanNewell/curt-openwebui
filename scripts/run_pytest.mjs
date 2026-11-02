@@ -1,5 +1,5 @@
 /**
- * Runs the Python pipeline test suite (`python -m pytest pipelines/tests`).
+ * Runs both Python test suites (`python -m pytest functions/tests pipelines/tests`).
  * Exits 0 with a message if no Python interpreter is available so the JS
  * suite alone still passes `npm test`.
  */
@@ -23,14 +23,18 @@ function findPython() {
 const python = findPython();
 if (!python) {
   console.error(
-    "[curt-openwebui] Python not found — skipping the pipeline test suite " +
-      "(pipelines/tests). Install Python 3.10+ to run the full test matrix."
+    "[curt-openwebui] Python not found — skipping the Python test suites " +
+      "(functions/tests, pipelines/tests). Install Python 3.10+ to run the full test matrix."
   );
   process.exit(0);
 }
 
-const res = spawnSync(python, ["-m", "pytest", "pipelines/tests", "-q"], {
-  cwd: repoRoot,
-  stdio: "inherit",
-});
+const res = spawnSync(
+  python,
+  ["-m", "pytest", "functions/tests", "pipelines/tests", "-q"],
+  {
+    cwd: repoRoot,
+    stdio: "inherit",
+  }
+);
 process.exit(res.status ?? 1);

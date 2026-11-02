@@ -2,14 +2,20 @@
 
 Export [Open WebUI](https://github.com/open-webui/open-webui) chats to
 [`.curt`](https://github.com/JordanNewell/dot_curt) v1 single-file conversation
-files. Two artifacts:
+files. Three artifacts:
 
 1. **`curt-openwebui-export`** — standalone TypeScript/Node CLI. Reads a chat
    export file or fetches from the Open WebUI REST API; writes one validated
    `.curt` per chat.
-2. **`pipelines/curt_export_pipeline.py`** — a community
-   [open-webui/pipelines](https://github.com/open-webui/pipelines) filter that
-   writes/updates a `.curt` file as each conversation happens.
+2. **`functions/curt_export_function.py`** — an Open WebUI **Filter Function**
+   (the official successor to pipelines; install steps in
+   [`functions/INSTALL.md`](functions/INSTALL.md)) that writes/updates a
+   `.curt` file as each conversation happens.
+3. **`pipelines/curt_export_pipeline.py`** — legacy:
+   [open-webui/pipelines](https://github.com/open-webui/pipelines) is
+   deprecated. **Pipelines is deprecated — use Functions**
+   ([official Filter Function docs](https://docs.openwebui.com/features/extensibility/plugin/functions/filter/));
+   this file is kept only for existing deployments.
 
 ## Schema verification
 
@@ -92,25 +98,37 @@ an invalid conversation is reported and skipped, never half-written. Output
 names follow the Curtis bulk convention (`YYYY-MM-DD slug suffix.curt`, via
 `curtFilename`).
 
-## Pipeline
+## Function (recommended)
+
+Import `functions/curt_export_function.py` via **Admin Panel > Functions**
+(full steps in [`functions/INSTALL.md`](functions/INSTALL.md)). Valves:
+`EXPORT_DIR`, `EXPORT_ON_OUTLET`. No pip packages required — the Function is
+stdlib-only; it reads `chat_id` from the outlet body (Functions receive it
+natively) and synthesizes title/id/models when the body carries no chat
+payload. The user parameter uses the official `__user__` dunder convention
+(verified against upstream `backend/open_webui/utils/filter.py`). An export
+failure never breaks the chat turn. Its output round-trips through the
+reference `parseCurt`.
+
+On `outlet`, the Function shapes the body as a ChatResponse record and maps it
+with the exact same rules as the CLI (visible `history` branch, block-array
+content, hidden error stubs, variant counting) — see
+`scripts/parity-check.md`. The Function module mirrors the pipeline mapping
+line-for-line (Functions are installed as a standalone single file, so it
+cannot import the pipeline module); `functions/tests/test_parity.py` pins the
+two together.
+
+## Legacy pipeline
 
 Copy `pipelines/curt_export_pipeline.py` into your pipelines `filters/`
 directory (requirements: `requests`, which is only used for the optional
 title/`created_at` enrichment call — the filter degrades gracefully without
 it). Valves: `OPENWEBUI_BASE_URL`, `OPENWEBUI_API_KEY`, `OUTPUT_DIR`,
-`EXPORT_ON_OUTLET`. The serializer and v1 validation are implemented
-stdlib-only inside the file; its output round-trips through the reference
-`parseCurt`.
-
-On `outlet`, the filter shapes the body as a ChatResponse record and maps it
-with the exact same rules as the CLI (visible `history` branch, block-array
-content, hidden error stubs, variant counting) — see
-`scripts/parity-check.md`. Bodies that carry no `chat` payload fall back to
-the raw turn-body message list with the same per-message rules.
+`EXPORT_ON_OUTLET`.
 
 ```sh
-npm test                                   # vitest (32 tests) + pytest (27 tests)
-python -m pytest pipelines/tests -q        # Python suite alone
+npm test                                   # vitest (32) + pytest (47)
+python -m pytest functions/tests pipelines/tests -q   # Python suites alone
 ```
 
 The pytest leg skips cleanly with a message when Python 3.10+ is absent.
