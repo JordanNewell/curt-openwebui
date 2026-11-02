@@ -74,6 +74,12 @@ export interface ExportStats {
   messages: number;
   /** Messages dropped because their role is outside the .curt v1 role set. */
   skippedRoles: number;
+  /**
+   * Messages the UI hides: legacy error stubs whose `error` field is the
+   * boolean true (the error string is stored in content and ResponseMessage
+   * renders it only when error !== true).
+   */
+  skippedHidden: number;
   /** Branches of the message tree not exported (only the current branch is kept). */
   skippedBranches: number;
 }

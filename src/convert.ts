@@ -119,6 +119,7 @@ export function convertChat(
     chats: 1,
     messages: 0,
     skippedRoles: 0,
+    skippedHidden: 0,
     skippedBranches: 0,
   };
 
@@ -133,6 +134,14 @@ export function convertChat(
   for (const m of flattenMessages(chat, stats)) {
     if (typeof m?.role !== "string" || !CURT_ROLES.has(m.role)) {
       stats.skippedRoles++;
+      continue;
+    }
+    if (m.error === true) {
+      // Legacy error stub: the UI never renders the content of a message
+      // whose error field is the boolean true (ResponseMessage.svelte renders
+      // content only when error !== true; the error string is stored in
+      // content). Skip so the export matches what the UI shows.
+      stats.skippedHidden++;
       continue;
     }
     const { text, structured } = contentToText(m);

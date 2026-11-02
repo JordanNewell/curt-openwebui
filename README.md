@@ -19,8 +19,9 @@ All field names were verified against the open-webui `main` source (not guessed)
 |---|---|
 | `ChatResponse`: `id`, `user_id`, `title`, `chat: dict`, `created_at`/`updated_at` (epoch **seconds**), `share_id`, `archived`, `pinned`, `meta`, `variables`, `folder_id`, `summary`, `current_message_id` | `backend/open_webui/models/chats.py` |
 | `GET /api/v1/chats/all` streams **NDJSON** (one `ChatResponse` per line), batch size 100 | `backend/open_webui/routers/chats.py` → `generate_chat_export_ndjson` |
-| `chat.chat.history.messages` is a `Record<id, message>` tree linked by `parentId`; the visible conversation is the parent chain ending at `history.currentId` | `src/lib/utils/index.ts` → `createMessagesList` |
+| `chat.chat.history.messages` is a `Record<id, message>` tree linked by `parentId`; the visible conversation is the parent chain ending at `history.currentId` | `src/lib/components/chat/Messages.svelte` → `buildMessages` (same walk as `createMessagesList` in `src/lib/utils/index.ts`) |
 | Legacy chats keep a flat array at `chat.chat.messages` | `backend/open_webui/models/chats.py` (dual-write path) |
+| A message with `error === true` is a legacy error stub — the error string is stored in `content` and the UI never renders that content | `src/lib/components/chat/Messages/ResponseMessage.svelte` (`hasResponseContent && message.error !== true`) |
 | Message fields: `id`, `parentId`, `childrenIds`, `role`, `content`, `timestamp` (epoch **seconds**, `Math.floor(Date.now()/1000)`), `model` / `model_id`, `done`, `error`, `files`, `sources`, `usage`, `annotations`; newer rows may store `content` as a **list of typed blocks** | `src/lib/components/chat/Chat.svelte`, `src/lib/components/chat/Messages/ResponseMessage.svelte`, `backend/open_webui/models/chat_messages.py` |
 
 ## Mapping → .curt v1
@@ -36,6 +37,7 @@ All field names were verified against the open-webui `main` source (not guessed)
 | `chat.models` | `conversation.model` | joined; `provider` = `"Open WebUI"` |
 | `files`, `sources`, `usage`, `annotations`, `error` | same-named passthrough fields | .curt readers ignore unknowns and preserve them on round-trip |
 | block-array `content` | `content` (text blocks joined) + `openwebuiContent` passthrough | original structured payload kept verbatim |
+| `error === true` (legacy error stub) | dropped | UI renders only an error bubble for these, never the content; counted as `skippedHidden` in the CLI summary. Error *objects* are kept with `error` passthrough |
 | `folder_id`, `share_id`, `summary` | conversation passthrough fields | |
 | roles outside `user/assistant/system/tool` | dropped | counted in the export summary |
 
@@ -59,9 +61,12 @@ image, API-key auth over HTTP):
   `.curt` files — tree traversal, block-array content (joined + preserved as
   `openwebuiContent`), and model fields all exercised on real API records.
 - Python pipeline serializer cross-checked 2/2 valid on the same records.
-- Known parity gap (pre-PR): the pipeline maps the *turn body* message list
-  and does not traverse `chat.history` parent-linked trees — the CLI handles
-  trees. Align before or during the upstream PR.
+- ~~Known parity gap (pre-PR): the pipeline maps the *turn body* message list
+  and does not traverse `chat.history` parent-linked trees.~~ **Closed** — the
+  pipeline now walks `chat.history.messages` from `history.currentId` with
+  the exact same rule as the CLI (`convert_chat` mirrors `convertChat`), and
+  `test/parity.test.ts` deep-compares both implementations on shared fixtures
+  so they cannot drift (see `scripts/parity-check.md`).
 - Deploy gotcha: API keys require env `ENABLE_API_KEYS` (plural). The value
   is persisted to the DB at first boot — setting the env on an existing
   instance is not enough; flip it in Admin Settings or start with a fresh
@@ -95,13 +100,20 @@ title/`created_at` enrichment call — the filter degrades gracefully without
 it). Valves: `OPENWEBUI_BASE_URL`, `OPENWEBUI_API_KEY`, `OUTPUT_DIR`,
 `EXPORT_ON_OUTLET`. The serializer and v1 validation are implemented
 stdlib-only inside the file; its output round-trips through the reference
-`parseCurt` (see `pipelines/test_curt_export_pipeline.py` and the cross-check
-below).
+`parseCurt`.
+
+On `outlet`, the filter shapes the body as a ChatResponse record and maps it
+with the exact same rules as the CLI (visible `history` branch, block-array
+content, hidden error stubs, variant counting) — see
+`scripts/parity-check.md`. Bodies that carry no `chat` payload fall back to
+the raw turn-body message list with the same per-message rules.
 
 ```sh
-python -m unittest discover -s pipelines   # 8 tests
-npm test                                   # 15 tests, includes CLI end-to-end
+npm test                                   # vitest (32 tests) + pytest (27 tests)
+python -m pytest pipelines/tests -q        # Python suite alone
 ```
+
+The pytest leg skips cleanly with a message when Python 3.10+ is absent.
 
 ## License
 

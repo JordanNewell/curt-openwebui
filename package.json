@@ -15,7 +15,9 @@
   ],
   "scripts": {
     "build": "tsc && node -e \"require('fs').cpSync('test/fixtures','dist/test/fixtures',{recursive:true})\"",
-    "test": "npm run build && node --test \"dist/test/*.test.js\"",
+    "test:js": "npm run build && vitest run",
+    "test:py": "node scripts/run_pytest.mjs",
+    "test": "npm run test:js && npm run test:py",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.7"
   }
 }

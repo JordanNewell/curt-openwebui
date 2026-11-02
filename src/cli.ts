@@ -73,12 +73,18 @@ async function main(): Promise<number> {
   const generator = `${GENERATOR}@${version}`;
   let written = 0;
   let empty = 0;
-  const totals = { messages: 0, skippedRoles: 0, skippedBranches: 0 };
+  const totals = {
+    messages: 0,
+    skippedRoles: 0,
+    skippedHidden: 0,
+    skippedBranches: 0,
+  };
 
   for (const chat of chats) {
     const { conversation, stats } = convertChat(chat, version);
     totals.messages += stats.messages;
     totals.skippedRoles += stats.skippedRoles;
+    totals.skippedHidden += stats.skippedHidden;
     totals.skippedBranches += stats.skippedBranches;
 
     if (conversation.messages.length === 0) {
@@ -104,6 +110,7 @@ async function main(): Promise<number> {
     `Done: ${written} .curt file(s), ${totals.messages} messages. ` +
       `${empty} empty chat(s) skipped` +
       (totals.skippedRoles ? `, ${totals.skippedRoles} message(s) with unsupported roles dropped` : "") +
+      (totals.skippedHidden ? `, ${totals.skippedHidden} hidden error-stub message(s) dropped` : "") +
       (totals.skippedBranches ? `, ${totals.skippedBranches} regenerate-variant message(s) on non-current branches dropped` : "") +
       "."
   );
