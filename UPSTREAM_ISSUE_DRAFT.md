@@ -25,7 +25,9 @@ against the v1 rules before being kept. The pipeline's output has been
 round-trip tested against the format's reference parser; vitest and pytest
 suites cover the mapping (plain, legacy-flat, block-array and
 regenerate-variant chats), and a cross-implementation parity test pins the
-pipeline to the exact same mapping rules as the standalone CLI.
+pipeline to the exact same mapping rules as the standalone CLI. Source:
+https://github.com/JordanNewell/curt-openwebui (pipeline in
+`pipelines/curt_export_pipeline.py`).
 Would the maintainers be open to a PR adding this under `examples/filters/`?
 A native export option in the UI (Settings → Chats) could reuse the same
 mapping later; the converter logic is also available standalone as the npm
