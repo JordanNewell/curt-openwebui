@@ -1,18 +1,18 @@
 ### Problem
 
-Open WebUI's native export (NDJSON) handles instance migration and backup well, but there is no interop path outside Open WebUI: the export payload is the internal chat object, so external tools can't consume it without reimplementing the internals (the `history` message tree keyed by `parentId`, epoch-seconds timestamps, `chat` payload nesting, block-array content). I'm trying to get conversations into portable, tool-agnostic formats, but every consumer has to re-derive what the UI already knows.
+Open WebUI's native export (NDJSON) handles instance migration and backup well, but the export payload is the internal chat object, so there is no *spec'd* interop path outside Open WebUI: every external tool has to reverse-engineer the internals (the `history` message tree keyed by `parentId`, epoch-seconds timestamps, `chat` payload nesting, block-array content) and hope they don't change shape between versions. I'm trying to get conversations into portable, tool-agnostic formats, but every consumer has to re-derive what the UI already knows.
 
 ### Desired Behavior
 
-A portable per-conversation export that preserves what the UI actually renders — the visible branch (`history.currentId` parent-chain walk), roles, model ids, timestamps, attachments — in an open, self-describing single-file format. With the Functions system this requires no core changes: I've built and verified a Filter Function that does exactly this on `outlet`, and I'm sharing it as a working reference.
+A portable per-conversation export that preserves what the UI actually renders — the visible branch (`history.currentId` parent-chain walk), roles, model ids, timestamps, attachments — in an open, self-describing single-file format. Today the only export path is `generate_chat_export_ndjson` in `backend/open_webui/routers/chats.py`, so this could slot in beside it. With the Functions system this requires no core changes at all: I've built and verified a Filter Function that does exactly this on `outlet`, and I'm sharing it as a working reference.
 
-**What the Function does** (`curt_export_function.py`, single stdlib-only file, installs via the admin Functions importer): serializes the conversation to a [`.curt`](https://github.com/JordanNewell/dot_curt) file — a small open single-file conversation format (JSON envelope, epoch-ms timestamps, strict whole-file validation, unknown fields preserved on round-trip). Regenerate variants are counted in a passthrough field; attachments ride as passthrough `files`. Files follow the format's `YYYY-MM-DD slug id-suffix.curt` bulk naming and are validated before being kept. Export failures never break the chat turn.
+**What the Function does** (`curt_export_function.py`, single file — its only import beyond the stdlib is `pydantic`, which ships with Open WebUI itself; installs via the admin Functions importer): serializes the conversation to a [`.curt`](https://github.com/JordanNewell/dot_curt) file — a small open single-file conversation format (JSON envelope, epoch-ms timestamps, strict whole-file validation, unknown fields preserved on round-trip). Regenerate variants are counted in a passthrough field; attachments ride as passthrough `files`. Files follow the format's `YYYY-MM-DD slug id-suffix.curt` bulk naming and are validated before being kept. Export failures never break the chat turn.
 
 ### Why This Matters
 
 - **Users** get conversations in a format any tool can read — not locked to re-import into the same instance
 - **The Functions ecosystem** gains a reference implementation demonstrating outlet-time per-conversation export, including the less-documented parts (`__user__` injection, `chat_id` in the outlet body, `error === true` hidden-message semantics)
-- **The format spec** ([dotcurt.org](https://dotcurt.org)) stays vendor-neutral: the `curt` magic field is a legacy string, nothing in the format favors any product
+- **The format spec** ([dotcurt.org](https://dotcurt.org)) stays vendor-neutral: the envelope's `curt` field carries the frozen legacy value `"curtis-conversation"`, but nothing in the format favors any product
 
 ### Examples
 
